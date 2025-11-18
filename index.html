@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF翻译与总结</title>
+    <style>
+        :root {
+            --primary: #0066cc;
+            --success: #4caf50;
+            --warning: #ff9800;
+            --danger: #f44336;
+        }
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #f5f7fa 0%, #e4edf5 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            padding: 30px;
+            transition: all 0.3s ease;
+        }
+        h1 {
+            text-align: center;
+            color: var(--primary);
+            margin-bottom: 25px;
+            font-size: 2.2rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+        h1::before {
+            content: "📄";
+            font-size: 1.8rem;
+        }
+        .upload-area {
+            border: 2px dashed #ccc;
+            border-radius: 12px;
+            padding: 40px 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: #f8f9ff;
+        }
+        .upload-area:hover {
+            background: #eef2ff;
+            border-color: var(--primary);
+        }
+        .upload-area i {
+            font-size: 3rem;
+            color: #aaa;
+            margin-bottom: 15px;
+        }
+        .btn {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            font-size: 1.1rem;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.3s;
+            font-weight: 600;
+            margin-top: 20px;
+            display: inline-block;
+        }
+        .btn:hover {
+            background: #0052a3;
+        }
+        .btn:disabled {
+            background: #aaa;
+            cursor: not-allowed;
+        }
+        .result-container {
+            margin-top: 35px;
+            border-top: 1px solid #eee;
+            padding-top: 25px;
+            display: none;
+        }
+        .result-title {
+            color: var(--primary);
+            font-size: 1.4rem;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .result-title::before {
+            content: "📝";
+        }
+        .text-area {
+            background: #f8f9ff;
+            border-radius: 8px;
+            padding: 20px;
+            font-size: 1.05rem;
+            line-height: 1.6;
+            border: 1px solid #ddd;
+            min-height: 200px;
+            margin-bottom: 20px;
+            overflow-y: auto;
+        }
+        .summary {
+            background: #e8f5e9;
+            border-left: 4px solid var(--success);
+        }
+        .translated {
+            background: #e3f2fd;
+            border-left: 4px solid var(--primary);
+        }
+        .loading {
+            text-align: center;
+            margin: 20px 0;
+            display: none;
+        }
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid var(--primary);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .footer {
+            text-align: center;
+            margin-top: 40px;
+            color: #777;
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>PDF翻译与总结</h1>
+
+        <div class="upload-area" id="uploadArea">
+            <i>📄</i>
+            <h3>点击或拖拽上传 PDF 文件</h3>
+            <p style="color: #777; margin: 15px 0;">支持 PDF 格式，最大 20MB</p>
+            <input type="file" id="pdfFile" accept=".pdf" style="display: none;">
+            <button class="btn" id="uploadBtn">选择文件</button>
+        </div>
+
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p style="margin-top: 10px; color: #555;">正在处理中... 请稍候</p>
+        </div>
+
+        <div class="result-container" id="resultContainer">
+            <h2 class="result-title">翻译结果</h2>
+            <div class="text-area translated" id="translatedText"></div>
+
+            <h2 class="result-title">摘要</h2>
+            <div class="text-area summary" id="summaryText"></div>
+        </div>
+
+        <div class="footer">
+            <p>基于阿里云通义千问大模型 | 2025 © PDF Translator</p>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const uploadArea = document.getElementById('uploadArea');
+            const pdfFileInput = document.getElementById('pdfFile');
+            const uploadBtn = document.getElementById('uploadBtn');
+            const resultContainer = document.getElementById('resultContainer');
+            const loading = document.getElementById('loading');
+            const translatedText = document.getElementById('translatedText');
+            const summaryText = document.getElementById('summaryText');
+
+            // 点击上传区域
+            uploadArea.addEventListener('click', () => {
+                pdfFileInput.click();
+            });
+
+            // 选择文件
+            pdfFileInput.addEventListener('change', (e) => {
+                if (e.target.files.length > 0) {
+                    processPDF(e.target.files[0]);
+                }
+            });
+
+            // 点击按钮上传
+            uploadBtn.addEventListener('click', () => {
+                pdfFileInput.click();
+            });
+
+            // 拖放支持
+            uploadArea.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                uploadArea.style.borderColor = '#0066cc';
+                uploadArea.style.backgroundColor = '#eef2ff';
+            });
+
+            uploadArea.addEventListener('dragleave', () => {
+                uploadArea.style.borderColor = '#ccc';
+                uploadArea.style.backgroundColor = '#f8f9ff';
+            });
+
+            uploadArea.addEventListener('drop', (e) => {
+                e.preventDefault();
+                uploadArea.style.borderColor = '#ccc';
+                uploadArea.style.backgroundColor = '#f8f9ff';
+
+                if (e.dataTransfer.files.length > 0) {
+                    processPDF(e.dataTransfer.files[0]);
+                }
+            });
+
+            async function processPDF(file) {
+                // 验证文件
+                if (file.size > 20 * 1024 * 1024) { // 20MB
+                    alert('文件太大！请上传小于 20MB 的 PDF');
+                    return;
+                }
+
+                if (!file.name.toLowerCase().endsWith('.pdf')) {
+                    alert('请选择 PDF 文件');
+                    return;
+                }
+
+                // 显示加载状态
+                loading.style.display = 'block';
+                uploadArea.style.display = 'none';
+                resultContainer.style.display = 'none';
+                uploadBtn.style.display = 'none';
+
+                const formData = new FormData();
+                formData.append('file', file);
+
+                try {
+                    const response = await fetch('/translate-and-summarize', {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    if (!response.ok) {
+                        throw new Error('处理失败: ' + response.status);
+                    }
+
+                    const result = await response.json();
+
+                    // 显示结果
+                    translatedText.textContent = result.translated_text;
+                    summaryText.textContent = result.summary;
+                    resultContainer.style.display = 'block';
+
+                } catch (error) {
+                    alert('错误: ' + error.message);
+                } finally {
+                    loading.style.display = 'none';
+                }
+            }
+        });
+    </script>
+</body>
+</html>
